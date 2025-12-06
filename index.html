@@ -60,7 +60,8 @@
         canvas {
             max-width: 100%;
             height: auto;
-            filter: drop-shadow(0 8px 20px rgba(255, 0, 0, 0.2));
+            /* Легкая тень, чтобы сердце "парило" */
+            filter: drop-shadow(0 10px 20px rgba(255, 0, 60, 0.25));
         }
         
         .footer {
@@ -73,10 +74,10 @@
 <body>
 
 <div class="container">
-    <h1>Heart QR Generator ❤️</h1>
+    <h1>Heart QR Art ❤️</h1>
     
     <div class="input-group">
-        <input type="text" id="qr-text" value="Я тебя люблю" placeholder="Ваш текст или ссылка...">
+        <input type="text" id="qr-text" value="I LOVE YOU" placeholder="Текст или ссылка">
         <button onclick="generateArtQR()">Создать</button>
     </div>
 
@@ -86,7 +87,6 @@
 </div>
 
 <script>
-    // Функция рисования контура сердца
     function drawHeartPath(ctx, x, y, width, height) {
         ctx.beginPath();
         const topCurveHeight = height * 0.3;
@@ -98,19 +98,24 @@
         ctx.closePath();
     }
 
-    // Функция для рисования скругленного прямоугольника (подложка под QR)
-    function drawRoundedRect(ctx, x, y, width, height, radius) {
+    // Функция рисования круглой точки
+    function drawDot(ctx, x, y, size, color) {
+        ctx.fillStyle = color;
         ctx.beginPath();
-        ctx.moveTo(x + radius, y);
-        ctx.lineTo(x + width - radius, y);
-        ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-        ctx.lineTo(x + width, y + height - radius);
-        ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-        ctx.lineTo(x + radius, y + height);
-        ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-        ctx.lineTo(x, y + radius);
-        ctx.quadraticCurveTo(x, y, x + radius, y);
-        ctx.closePath();
+        // Рисуем круг (radius = size / 2)
+        // Умножаем на 0.85, чтобы между точками был маленький зазор (воздух)
+        const radius = (size / 2) * 0.85; 
+        ctx.arc(x + size/2, y + size/2, radius, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Функция рисования квадрата с сильным скруглением (для "глаз" QR кода)
+    function drawRoundedBox(ctx, x, y, size, color) {
+        ctx.fillStyle = color;
+        const r = size * 0.35; // Радиус скругления
+        ctx.beginPath();
+        ctx.roundRect(x, y, size, size, r);
+        ctx.fill();
     }
 
     function generateArtQR() {
@@ -121,101 +126,116 @@
         const W = canvas.width;
         const H = canvas.height;
         const mainColor = "#ff0033"; 
-        
-        // Очистка
+
         ctx.clearRect(0, 0, W, H);
-        // Белый фон на весь холст (чтобы при сохранении не было черного фона)
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(0, 0, W, H);
 
         // --- ГЕОМЕТРИЯ ---
-        const heartW = 520;
-        const heartH = 480;
+        const heartW = 540;
+        const heartH = 500;
         const heartX = W / 2;
-        const heartY = 40; 
+        const heartY = 30;
 
-        // Генерация QR данных
-        const qr = qrcode(0, 'M'); 
+        // Генерация QR
+        const qr = qrcode(0, 'H'); // 'H' - высокий уровень коррекции, код плотнее и красивее
         qr.addData(text);
         qr.make();
         const moduleCount = qr.getModuleCount();
         
-        const qrSize = 240; 
-        const pixelSize = qrSize / moduleCount;
+        // Размер модуля (точки) подбираем так, чтобы код занимал разумное место
+        const qrPixelSize = 13; // Фиксированный размер точки для четкости
+        const qrMatrixSizePixels = moduleCount * qrPixelSize;
+        
+        // Позиция QR (смещение вниз в широкую часть)
+        const startX = (W - qrMatrixSizePixels) / 2;
+        const startY = heartY + (heartH * 0.22); // Чуть выше центра масс
 
-        // Позиция QR (смещена вниз)
-        const startX = (W - qrSize) / 2;
-        const startY = heartY + (heartH * 0.25);
-
-        // --- 1. РИСУЕМ СПЛОШНОЕ СЕРДЦЕ И ШУМ ---
+        // --- ЛОГИКА ЕДИНОЙ СЕТКИ ---
+        // Мы будем рисовать точки по всей площади сердца, используя ту же сетку, что и у QR
+        
+        // 1. Создаем маску сердца (Clip)
         ctx.save();
         drawHeartPath(ctx, heartX, heartY, heartW, heartH);
-        ctx.clip(); // Работаем только внутри сердца
+        ctx.clip();
 
-        // Рисуем шум везде
-        const cellSize = 12; 
-        for (let y = 0; y < H; y += cellSize) {
-            for (let x = 0; x < W; x += cellSize) {
-                if (Math.random() > 0.45) {
-                    ctx.fillStyle = mainColor;
-                    ctx.fillRect(x, y, cellSize, cellSize);
+        // Расширяем сетку на весь холст
+        // Вычисляем, сколько точек влезает в холст
+        const cols = Math.ceil(W / qrPixelSize);
+        const rows = Math.ceil(H / qrPixelSize);
+
+        // Определяем границы QR кода в координатах сетки
+        // Находим, с какой колонки/строки начинается QR код
+        const qrStartCol = Math.floor(startX / qrPixelSize);
+        const qrStartRow = Math.floor(startY / qrPixelSize);
+        
+        // Зона тишины (отступ в блоках)
+        const quietPadding = 2; 
+
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                const x = c * qrPixelSize;
+                const y = r * qrPixelSize;
+
+                // Проверяем, попадает ли текущая точка внутрь зоны QR кода (включая рамку тишины)
+                const inQrZoneX = (c >= qrStartCol - quietPadding) && (c < qrStartCol + moduleCount + quietPadding);
+                const inQrZoneY = (r >= qrStartRow - quietPadding) && (r < qrStartRow + moduleCount + quietPadding);
+                const inQrZone = inQrZoneX && inQrZoneY;
+
+                if (inQrZone) {
+                    // --- МЫ ВНУТРИ ЗОНЫ QR ---
+                    
+                    // Вычисляем координаты внутри QR матрицы
+                    const qrR = r - qrStartRow;
+                    const qrC = c - qrStartCol;
+
+                    // Если мы в "зоне тишины" (рамка), ничего не рисуем (оставляем белым)
+                    if (qrR < 0 || qrC < 0 || qrR >= moduleCount || qrC >= moduleCount) {
+                        continue; 
+                    }
+
+                    // Если это сам модуль данных
+                    if (qr.isDark(qrR, qrC)) {
+                        // Проверка: это часть "Глаза" (большого квадрата)?
+                        // Глаза находятся в углах: (0,0), (0, конец), (конец, 0)
+                        // Размер глаза обычно 7x7 модулей
+                        const isEye = (qrR < 7 && qrC < 7) || 
+                                      (qrR < 7 && qrC >= moduleCount - 7) || 
+                                      (qrR >= moduleCount - 7 && qrC < 7);
+                        
+                        if (isEye) {
+                            // Глаза рисуем квадратиками, чтобы сканер лучше цеплялся
+                            // Но чуть скруглим их
+                             // Рисуем не по модулям, а просто заливаем (чуть ниже), 
+                             // здесь просто ставим флаг или рисуем как есть.
+                             // Проще нарисовать просто точку, но чуть крупнее
+                             ctx.fillStyle = mainColor;
+                             ctx.fillRect(x, y, qrPixelSize + 0.5, qrPixelSize + 0.5);
+                        } else {
+                            // Данные рисуем красивыми КРУЖОЧКАМИ
+                            drawDot(ctx, x, y, qrPixelSize, mainColor);
+                        }
+                    }
+                } else {
+                    // --- МЫ СНАРУЖИ (ФОН) ---
+                    // Рисуем декоративные точки
+                    // Вероятность появления точки (плотность фона)
+                    if (Math.random() > 0.65) {
+                        // Используем drawDot, чтобы стиль совпадал с кодом
+                        drawDot(ctx, x, y, qrPixelSize, "#ff0033"); 
+                    }
                 }
             }
         }
-        ctx.restore();
+        ctx.restore(); // Снимаем обрезку сердца
 
-        // --- 2. ЖИРНАЯ ОБВОДКА СЕРДЦА ---
+        // 2. Рисуем контур сердца поверх
         ctx.save();
-        ctx.lineWidth = 14;
+        ctx.lineWidth = 12;
         ctx.strokeStyle = mainColor;
         drawHeartPath(ctx, heartX, heartY, heartW, heartH);
         ctx.stroke();
         ctx.restore();
-
-        // --- 3. "ВЫРЕЗАЕМ" МЕСТО ПОД QR ---
-        // Рисуем белый скругленный квадрат поверх шума.
-        // Это и есть Quiet Zone, которая делает код читаемым.
-        const padding = 25; // Увеличил отступ для надежности
-        const bgSize = qrSize + (padding * 2);
-        const bgX = startX - padding;
-        const bgY = startY - padding;
-        const borderRadius = 35; // Сильное скругление, чтобы было мягко
-
-        ctx.fillStyle = "#ffffff";
-        drawRoundedRect(ctx, bgX, bgY, bgSize, bgSize, borderRadius);
-        ctx.fill();
-
-        // Опционально: можно добавить ОЧЕНЬ тонкую обводку вокруг белой зоны, 
-        // если хочется четкости, но вы просили незаметный переход, поэтому оставим чисто белым.
-        // Если сканируется плохо, раскомментируйте строки ниже:
-        /*
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = "#ffe6e9"; // Очень бледный розовый
-        ctx.stroke();
-        */
-
-        // --- 4. РИСУЕМ САМ QR ---
-        ctx.fillStyle = mainColor;
-        for (let row = 0; row < moduleCount; row++) {
-            for (let col = 0; col < moduleCount; col++) {
-                if (qr.isDark(row, col)) {
-                    // Рисуем точки
-                    // Можно рисовать их кружочками, чтобы сочеталось со скругленной подложкой
-                    const px = startX + col * pixelSize;
-                    const py = startY + row * pixelSize;
-                    
-                    // Вариант А: Квадраты (классика, лучше читается)
-                    ctx.fillRect(px, py, pixelSize + 0.5, pixelSize + 0.5);
-
-                    // Вариант Б (экспериментальный): Кружочки (более стильнo)
-                    /*
-                    ctx.beginPath();
-                    ctx.arc(px + pixelSize/2, py + pixelSize/2, pixelSize/2, 0, Math.PI*2);
-                    ctx.fill();
-                    */
-                }
-            }
-        }
     }
 
     window.onload = generateArtQR;
