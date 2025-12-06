@@ -3,107 +3,220 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Генератор Heart QR</title>
-    <!-- Подключаем библиотеку для QR кодов -->
-    <script src="https://cdn.jsdelivr.net/npm/easyqrcodejs@4.5.0/dist/easy.qrcode.min.js"></script>
+    <title>Heart QR Generator</title>
+    <!-- Подключаем легкую библиотеку для математики QR -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
     <style>
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #ffe6e9; /* Нежно-розовый фон */
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #ffe6e9;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            min-height: 100vh;
             margin: 0;
+            flex-direction: column;
         }
         .container {
             background: white;
             padding: 30px;
-            border-radius: 20px;
-            box-shadow: 0 10px 25px rgba(255, 105, 180, 0.3);
+            border-radius: 25px;
+            box-shadow: 0 15px 35px rgba(214, 51, 108, 0.2);
             text-align: center;
-            max-width: 400px;
-            width: 100%;
+            max-width: 420px;
+            width: 90%;
+            border: 2px solid #fff0f3;
         }
-        h1 { color: #d6336c; margin-bottom: 20px; }
+        h1 { color: #d6336c; margin-top: 0; font-size: 24px; }
+        
+        .input-group {
+            margin-bottom: 20px;
+        }
         input {
-            width: 80%;
-            padding: 10px;
-            border: 2px solid #ffb6c1;
-            border-radius: 10px;
-            margin-bottom: 15px;
+            width: 70%;
+            padding: 12px;
+            border: 2px solid #ffc2d1;
+            border-radius: 12px;
             outline: none;
+            font-size: 14px;
+            color: #555;
         }
         button {
-            background-color: #ff477e;
+            background: linear-gradient(45deg, #ff477e, #ff0a54);
             color: white;
             border: none;
-            padding: 10px 20px;
-            border-radius: 10px;
+            padding: 12px 20px;
+            border-radius: 12px;
             cursor: pointer;
-            font-size: 16px;
-            transition: 0.3s;
+            font-weight: bold;
+            transition: transform 0.2s;
         }
-        button:hover { background-color: #d6336c; }
-        #qrcode {
-            margin-top: 20px;
+        button:hover { transform: scale(1.05); }
+
+        /* Контейнер для канваса */
+        #canvas-container {
+            margin-top: 10px;
             display: flex;
             justify-content: center;
+            position: relative;
         }
-        .hint { font-size: 12px; color: #888; margin-top: 10px; }
+        
+        canvas {
+            max-width: 100%;
+            height: auto;
+            /* Легкая тень для самого кода */
+            filter: drop-shadow(0 5px 5px rgba(214, 51, 108, 0.2)); 
+        }
+
+        .hint {
+            margin-top: 15px;
+            font-size: 12px;
+            color: #888;
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>QR-Code с любовью ❤️</h1>
-    <input type="text" id="urlInput" placeholder="Введите ссылку или текст" value="https://github.com">
-    <br>
-    <button onclick="generateQR()">Создать QR-код</button>
+    <h1>Генератор Heart QR ❤️</h1>
     
-    <div id="qrcode"></div>
-    <div class="hint">Нажмите правой кнопкой на QR, чтобы скачать его</div>
+    <div class="input-group">
+        <input type="text" id="text-input" value="Я тебя люблю!" placeholder="Введите текст...">
+        <button onclick="makeQR()">Создать</button>
+    </div>
+
+    <div id="canvas-container">
+        <canvas id="qr-canvas"></canvas>
+    </div>
+    
+    <p class="hint">Каждая точка здесь — это сердце.<br>Правый клик -> Сохранить картинку.</p>
 </div>
 
 <script>
-    // Картинка сердечка в формате Base64 (чтобы не создавать отдельные файлы)
-    const heartLogo = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAMAAABg3Am1AAAAbFBMVEUAAAD///8AAAD/AAAA/wD/AAAA/wD/AAAA/wD/AAAA/wD/AAAA/wD/AAAA/wD/AAAA/wD/AAAA/wD/AAAA/wD/AAAA/wD/AAAA/wD/AAAA/wD/AAAA/wD/AAAA/wD/AAAA/wD/AAAA/wD/AAAA/wD///+F3u1RAAAAI3RSTlMAAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAhIiBAOF8AAAG2SURBVEjH7ZbZcoMwEERDCxvGxmDABmzc///NBXOoK6nKZPqg5vKZkTSj0XBEf6s1+m9fa4xeHx6f3h+fnx7v49d79/X59f359fX99f01Cvh4e397f3t/e397f7uAj5/vH5+fH5+fH5+fHx/g9/vxb7x/gN8/Pz/A75+fH+D3z88P8Pvn5wf4/fPzA/z++fkBfv/8/AC/f35+gN8/Pz/A75+fH+D3z88P8Pvn5wf4/fPzA/z++fkBfv/8/AC/f35+gN8/Pz/A75+fH+D3z88P8Pvn5wf4/fPzA/z++fkBfv/8/AC/f35+gN8/Pz/A75+fH+D3z88P8Pvn5wf4/fPzA/z++fkBfv/8/AC/f35+gN8/Pz/A75+fH+D3z88P8Pvn5wf4/fPzA/z++fkBfv/8/AC/f35+gN8/Pz/A75+fH+D3z88P8Pvn5wf4/fPzA/z++fkBfv/8/AC/f35+gN8/Pz/A75+fH+D3z88P8Pvn5wf4/fPzA/z++fkBfv/8/AC/f35+gN8/Pz/A75+fH+D3z88P8Pvn5wf4/fPzA/z++fkBfv/8/AC/f35+gN8/Pz/A75+fH+D3z88P8Pvn5wf4/fPzA/z++fkBfv/8/AC/f35+gN8/Pz/A75+fH+D3z88P8Pvn5wf4/fPzA37j/Q/8xvsv9tFfJ18hL+UAAAAASUVORK5CYII=";
-
-    let qrcodeObj = null;
-
-    function generateQR() {
-        const text = document.getElementById("urlInput").value;
-        const container = document.getElementById("qrcode");
-        
-        // Очищаем предыдущий QR код
-        container.innerHTML = "";
-
-        // Настройки генератора
-        const options = {
-            text: text,
-            width: 256,
-            height: 256,
-            colorDark : "#d6336c", // Цвет самих точек (темно-розовый)
-            colorLight : "#ffffff", // Фон
-            correctLevel : QRCode.CorrectLevel.H, // Высокий уровень коррекции ошибок (обязательно для логотипа!)
-            
-            // Настройки логотипа (сердечка)
-            logo: heartLogo,
-            logoWidth: 80, 
-            logoHeight: 80,
-            logoBackgroundColor: '#ffffff', // Белая подложка под сердечком
-            logoBackgroundTransparent: false,
-            
-            quietZone: 15, // Отступы по краям
-            quietZoneColor: "transparent"
-        };
-
-        // Создаем QR код
-        qrcodeObj = new QRCode(container, options);
+    function drawHeart(ctx, x, y, size, color) {
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        // Математическая формула рисования сердца
+        let topCurveHeight = size * 0.3;
+        ctx.moveTo(x, y + topCurveHeight);
+        ctx.bezierCurveTo(x, y, x - size / 2, y, x - size / 2, y + topCurveHeight);
+        ctx.bezierCurveTo(x - size / 2, y + (size + topCurveHeight) / 2, x, y + size, x, y + size);
+        ctx.bezierCurveTo(x, y + size, x + size / 2, y + (size + topCurveHeight) / 2, x + size / 2, y + topCurveHeight);
+        ctx.bezierCurveTo(x + size / 2, y, x, y, x, y + topCurveHeight);
+        ctx.fill();
     }
 
-    // Генерируем QR при загрузке страницы
-    window.onload = generateQR;
+    function drawRoundedRect(ctx, x, y, width, height, radius, color) {
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(x + radius, y);
+        ctx.lineTo(x + width - radius, y);
+        ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+        ctx.lineTo(x + width, y + height - radius);
+        ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+        ctx.lineTo(x + radius, y + height);
+        ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+        ctx.lineTo(x, y + radius);
+        ctx.quadraticCurveTo(x, y, x + radius, y);
+        ctx.closePath();
+        ctx.fill();
+    }
+
+    function makeQR() {
+        const text = document.getElementById('text-input').value;
+        
+        // 1. Генерируем матрицу (логику 1 и 0)
+        // TypeNumber 0 = авто-выбор размера, 'H' = High Error Correction (лучше для арта)
+        let qr = qrcode(0, 'H'); 
+        qr.addData(text);
+        qr.make();
+
+        const moduleCount = qr.getModuleCount();
+        const tileSize = 20; // Размер одного квадратика/сердечка
+        const padding = 40;  // Белое поле вокруг
+        const canvasSize = moduleCount * tileSize + (padding * 2);
+
+        const canvas = document.getElementById('qr-canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Настраиваем размер Canvas (высокое разрешение)
+        canvas.width = canvasSize;
+        canvas.height = canvasSize;
+
+        // 2. Рисуем белый фон
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvasSize, canvasSize);
+
+        // 3. Проходимся по всем точкам QR кода
+        for (let r = 0; r < moduleCount; r++) {
+            for (let c = 0; c < moduleCount; c++) {
+                if (qr.isDark(r, c)) {
+                    let x = c * tileSize + padding;
+                    let y = r * tileSize + padding;
+
+                    // Проверяем, является ли точка частью больших угловых маркеров (Поисковые узоры)
+                    // Узоры нельзя рисовать сердечками, иначе камера не поймет, где верх/низ.
+                    // Мы их нарисуем красивыми скругленными квадратами.
+                    const isTopLeftEye = (r < 7 && c < 7);
+                    const isTopRightEye = (r < 7 && c >= moduleCount - 7);
+                    const isBottomLeftEye = (r >= moduleCount - 7 && c < 7);
+
+                    if (isTopLeftEye || isTopRightEye || isBottomLeftEye) {
+                        // Рисуем часть глаза (просто заливаем, чтобы не рябило)
+                        // Но лучше нарисовать сам глаз целиком отдельно, поэтому здесь пропускаем
+                        // логику "попиксельной" отрисовки глаз.
+                    } else {
+                        // ЭТО ОБЫЧНАЯ ТОЧКА ДАННЫХ -> РИСУЕМ СЕРДЕЧКО!
+                        // Слегка увеличим размер (tileSize + 2), чтобы они плотнее сидели
+                        // Сдвигаем x и y, чтобы центрировать сердце в ячейке
+                        drawHeart(ctx, x + tileSize/2, y + 2, tileSize, "#ff0a54");
+                    }
+                }
+            }
+        }
+
+        // 4. Рисуем красивые "Глаза" (угловые маркеры) поверх
+        function drawEye(r, c) {
+            const size = 7 * tileSize;
+            const x = c * tileSize + padding;
+            const y = r * tileSize + padding;
+            
+            // Внешняя рамка
+            ctx.strokeStyle = "#d6336c"; // Темно-розовый
+            ctx.lineWidth = tileSize;
+            
+            // Рисуем скругленный квадрат вместо строгого
+            // Скругляем углы (2 * tileSize)
+            let path = new Path2D();
+            // Внешний контур
+            const radius = 25;
+            ctx.fillStyle = "#d6336c";
+            
+            // Ручная отрисовка рамки глаза (Внешний квадрат)
+            drawRoundedRect(ctx, x, y, size, size, 20, "#d6336c");
+            // Вырезаем белую середину
+            drawRoundedRect(ctx, x + tileSize, y + tileSize, size - 2*tileSize, size - 2*tileSize, 10, "#ffffff");
+            // Рисуем зрачок (внутренний квадрат) - тоже можно сделать сердечком или квадратом
+            // Сделаем зрачок сердечком для стиля!
+            drawHeart(ctx, x + 3.5*tileSize, y + 3.5*tileSize - 10, 3*tileSize, "#ff0a54");
+        }
+
+        drawEye(0, 0); // Левый верх
+        drawEye(0, moduleCount - 7); // Правый верх
+        drawEye(moduleCount - 7, 0); // Левый низ
+
+        // 5. Добавляем логотип (большое сердце) в самый центр (опционально)
+        // Но так как у нас точки уже сердечки, можно и не добавлять, но для красоты давайте.
+        // Вычисляем центр
+        /*
+        const imgSize = canvasSize * 0.15;
+        const center = canvasSize / 2;
+        drawHeart(ctx, center, center - imgSize/2, imgSize, "#ff0000");
+        */
+    }
+
+    // Запуск при загрузке
+    window.onload = makeQR;
 </script>
 
 </body>
