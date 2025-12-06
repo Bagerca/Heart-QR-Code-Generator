@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Генератор Heart QR</title>
+    <!-- Подключаем библиотеку для QR кодов -->
+    <script src="https://cdn.jsdelivr.net/npm/easyqrcodejs@4.5.0/dist/easy.qrcode.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #ffe6e9; /* Нежно-розовый фон */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(255, 105, 180, 0.3);
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+        }
+        h1 { color: #d6336c; margin-bottom: 20px; }
+        input {
+            width: 80%;
+            padding: 10px;
+            border: 2px solid #ffb6c1;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            outline: none;
+        }
+        button {
+            background-color: #ff477e;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: 0.3s;
+        }
+        button:hover { background-color: #d6336c; }
+        #qrcode {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .hint { font-size: 12px; color: #888; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>QR-Code с любовью ❤️</h1>
+    <input type="text" id="urlInput" placeholder="Введите ссылку или текст" value="https://github.com">
+    <br>
+    <button onclick="generateQR()">Создать QR-код</button>
+    
+    <div id="qrcode"></div>
+    <div class="hint">Нажмите правой кнопкой на QR, чтобы скачать его</div>
+</div>
+
+<script>
+    // Картинка сердечка в формате Base64 (чтобы не создавать отдельные файлы)
+    const heartLogo = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAMAAABg3Am1AAAAbFBMVEUAAAD///8AAAD/AAAA/wD/AAAA/wD/AAAA/wD/AAAA/wD/AAAA/wD/AAAA/wD/AAAA/wD/AAAA/wD/AAAA/wD/AAAA/wD/AAAA/wD/AAAA/wD/AAAA/wD/AAAA/wD/AAAA/wD/AAAA/wD/AAAA/wD///+F3u1RAAAAI3RSTlMAAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAhIiBAOF8AAAG2SURBVEjH7ZbZcoMwEERDCxvGxmDABmzc///NBXOoK6nKZPqg5vKZkTSj0XBEf6s1+m9fa4xeHx6f3h+fnx7v49d79/X59f359fX99f01Cvh4e397f3t/e397f7uAj5/vH5+fH5+fH5+fHx/g9/vxb7x/gN8/Pz/A75+fH+D3z88P8Pvn5wf4/fPzA/z++fkBfv/8/AC/f35+gN8/Pz/A75+fH+D3z88P8Pvn5wf4/fPzA/z++fkBfv/8/AC/f35+gN8/Pz/A75+fH+D3z88P8Pvn5wf4/fPzA/z++fkBfv/8/AC/f35+gN8/Pz/A75+fH+D3z88P8Pvn5wf4/fPzA/z++fkBfv/8/AC/f35+gN8/Pz/A75+fH+D3z88P8Pvn5wf4/fPzA/z++fkBfv/8/AC/f35+gN8/Pz/A75+fH+D3z88P8Pvn5wf4/fPzA/z++fkBfv/8/AC/f35+gN8/Pz/A75+fH+D3z88P8Pvn5wf4/fPzA/z++fkBfv/8/AC/f35+gN8/Pz/A75+fH+D3z88P8Pvn5wf4/fPzA/z++fkBfv/8/AC/f35+gN8/Pz/A75+fH+D3z88P8Pvn5wf4/fPzA/z++fkBfv/8/AC/f35+gN8/Pz/A75+fH+D3z88P8Pvn5wf4/fPzA37j/Q/8xvsv9tFfJ18hL+UAAAAASUVORK5CYII=";
+
+    let qrcodeObj = null;
+
+    function generateQR() {
+        const text = document.getElementById("urlInput").value;
+        const container = document.getElementById("qrcode");
+        
+        // Очищаем предыдущий QR код
+        container.innerHTML = "";
+
+        // Настройки генератора
+        const options = {
+            text: text,
+            width: 256,
+            height: 256,
+            colorDark : "#d6336c", // Цвет самих точек (темно-розовый)
+            colorLight : "#ffffff", // Фон
+            correctLevel : QRCode.CorrectLevel.H, // Высокий уровень коррекции ошибок (обязательно для логотипа!)
+            
+            // Настройки логотипа (сердечка)
+            logo: heartLogo,
+            logoWidth: 80, 
+            logoHeight: 80,
+            logoBackgroundColor: '#ffffff', // Белая подложка под сердечком
+            logoBackgroundTransparent: false,
+            
+            quietZone: 15, // Отступы по краям
+            quietZoneColor: "transparent"
+        };
+
+        // Создаем QR код
+        qrcodeObj = new QRCode(container, options);
+    }
+
+    // Генерируем QR при загрузке страницы
+    window.onload = generateQR;
+</script>
+
+</body>
+</html>
