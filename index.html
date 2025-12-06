@@ -86,6 +86,7 @@
 </div>
 
 <script>
+    // Функция рисования контура сердца
     function drawHeartPath(ctx, x, y, width, height) {
         ctx.beginPath();
         const topCurveHeight = height * 0.3;
@@ -94,6 +95,21 @@
         ctx.bezierCurveTo(x - width / 2, y + (height + topCurveHeight) / 2, x, y + height, x, y + height);
         ctx.bezierCurveTo(x, y + height, x + width / 2, y + (height + topCurveHeight) / 2, x + width / 2, y + topCurveHeight);
         ctx.bezierCurveTo(x + width / 2, y, x, y, x, y + topCurveHeight);
+        ctx.closePath();
+    }
+
+    // Функция для рисования скругленного прямоугольника (подложка под QR)
+    function drawRoundedRect(ctx, x, y, width, height, radius) {
+        ctx.beginPath();
+        ctx.moveTo(x + radius, y);
+        ctx.lineTo(x + width - radius, y);
+        ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+        ctx.lineTo(x + width, y + height - radius);
+        ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+        ctx.lineTo(x + radius, y + height);
+        ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+        ctx.lineTo(x, y + radius);
+        ctx.quadraticCurveTo(x, y, x + radius, y);
         ctx.closePath();
     }
 
@@ -106,64 +122,49 @@
         const H = canvas.height;
         const mainColor = "#ff0033"; 
         
-        // Очистка холста (делает его белым/прозрачным)
+        // Очистка
         ctx.clearRect(0, 0, W, H);
-        // Заливаем фон белым явно, чтобы при сохранении картинки не было прозрачности
+        // Белый фон на весь холст (чтобы при сохранении не было черного фона)
         ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0,0, W, H);
+        ctx.fillRect(0, 0, W, H);
 
-        // --- 1. ПРЕДВАРИТЕЛЬНЫЙ РАСЧЕТ ПОЗИЦИИ QR ---
-        // Нам нужно знать где будет QR до того, как мы начнем рисовать фон,
-        // чтобы не рисовать "шум" под ним.
-        
-        const qr = qrcode(0, 'M'); 
-        qr.addData(text);
-        qr.make();
-        const moduleCount = qr.getModuleCount();
-        const qrSize = 240; 
-        const pixelSize = qrSize / moduleCount;
-
-        // Геометрия сердца
+        // --- ГЕОМЕТРИЯ ---
         const heartW = 520;
         const heartH = 480;
         const heartX = W / 2;
         const heartY = 40; 
 
-        // Позиция QR (смещена вниз на 25% высоты сердца)
+        // Генерация QR данных
+        const qr = qrcode(0, 'M'); 
+        qr.addData(text);
+        qr.make();
+        const moduleCount = qr.getModuleCount();
+        
+        const qrSize = 240; 
+        const pixelSize = qrSize / moduleCount;
+
+        // Позиция QR (смещена вниз)
         const startX = (W - qrSize) / 2;
         const startY = heartY + (heartH * 0.25);
 
-        // Определяем "Запретную зону" для шума.
-        // Это область QR кода + небольшой отступ (Quiet Zone), который обязан быть белым.
-        const quietZone = 20; // Обязательный белый отступ для сканера
-        const forbiddenX1 = startX - quietZone;
-        const forbiddenX2 = startX + qrSize + quietZone;
-        const forbiddenY1 = startY - quietZone;
-        const forbiddenY2 = startY + qrSize + quietZone;
-
-        // --- 2. РИСУЕМ ФОН (ШУМ) ---
+        // --- 1. РИСУЕМ СПЛОШНОЕ СЕРДЦЕ И ШУМ ---
         ctx.save();
         drawHeartPath(ctx, heartX, heartY, heartW, heartH);
-        ctx.clip(); // Обрезаем все по форме сердца
+        ctx.clip(); // Работаем только внутри сердца
 
+        // Рисуем шум везде
         const cellSize = 12; 
         for (let y = 0; y < H; y += cellSize) {
             for (let x = 0; x < W; x += cellSize) {
-                
-                // ГЛАВНОЕ ИЗМЕНЕНИЕ: Пропускаем рисование, если мы внутри зоны QR
-                if (x > forbiddenX1 && x < forbiddenX2 && y > forbiddenY1 && y < forbiddenY2) {
-                    continue; 
-                }
-
                 if (Math.random() > 0.45) {
                     ctx.fillStyle = mainColor;
                     ctx.fillRect(x, y, cellSize, cellSize);
                 }
             }
         }
-        ctx.restore(); 
+        ctx.restore();
 
-        // --- 3. ОБВОДКА СЕРДЦА ---
+        // --- 2. ЖИРНАЯ ОБВОДКА СЕРДЦА ---
         ctx.save();
         ctx.lineWidth = 14;
         ctx.strokeStyle = mainColor;
@@ -171,22 +172,47 @@
         ctx.stroke();
         ctx.restore();
 
-        // --- 4. РИСУЕМ QR КОД ---
-        // Мы НЕ рисуем белый прямоугольник с рамкой.
-        // Мы просто рисуем сами пиксели кода. Белый фон под ними уже есть (от очистки холста).
-        
+        // --- 3. "ВЫРЕЗАЕМ" МЕСТО ПОД QR ---
+        // Рисуем белый скругленный квадрат поверх шума.
+        // Это и есть Quiet Zone, которая делает код читаемым.
+        const padding = 25; // Увеличил отступ для надежности
+        const bgSize = qrSize + (padding * 2);
+        const bgX = startX - padding;
+        const bgY = startY - padding;
+        const borderRadius = 35; // Сильное скругление, чтобы было мягко
+
+        ctx.fillStyle = "#ffffff";
+        drawRoundedRect(ctx, bgX, bgY, bgSize, bgSize, borderRadius);
+        ctx.fill();
+
+        // Опционально: можно добавить ОЧЕНЬ тонкую обводку вокруг белой зоны, 
+        // если хочется четкости, но вы просили незаметный переход, поэтому оставим чисто белым.
+        // Если сканируется плохо, раскомментируйте строки ниже:
+        /*
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = "#ffe6e9"; // Очень бледный розовый
+        ctx.stroke();
+        */
+
+        // --- 4. РИСУЕМ САМ QR ---
         ctx.fillStyle = mainColor;
         for (let row = 0; row < moduleCount; row++) {
             for (let col = 0; col < moduleCount; col++) {
                 if (qr.isDark(row, col)) {
-                    // Рисуем пиксели
-                    // pixelSize + 0.6 делает их чуть жирнее, чтобы не было щелей
-                    ctx.fillRect(
-                        startX + col * pixelSize, 
-                        startY + row * pixelSize, 
-                        pixelSize + 0.6, 
-                        pixelSize + 0.6
-                    );
+                    // Рисуем точки
+                    // Можно рисовать их кружочками, чтобы сочеталось со скругленной подложкой
+                    const px = startX + col * pixelSize;
+                    const py = startY + row * pixelSize;
+                    
+                    // Вариант А: Квадраты (классика, лучше читается)
+                    ctx.fillRect(px, py, pixelSize + 0.5, pixelSize + 0.5);
+
+                    // Вариант Б (экспериментальный): Кружочки (более стильнo)
+                    /*
+                    ctx.beginPath();
+                    ctx.arc(px + pixelSize/2, py + pixelSize/2, pixelSize/2, 0, Math.PI*2);
+                    ctx.fill();
+                    */
                 }
             }
         }
